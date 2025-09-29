@@ -79,7 +79,7 @@ class SparkAI:
             status = choices["status"]
             content = choices["text"][0]["content"]
             self.answer += content
-            print(f"📝 星火AI回复: {content}")
+            print(f"星火AI回复: {content}")
             
             if status == 2:
                 self.answer_received = True
@@ -87,11 +87,11 @@ class SparkAI:
 
     def on_error(self, ws, error):
         """WebSocket错误处理"""
-        print(f"❌ WebSocket错误: {error}")
+        print(f"WebSocket错误: {error}")
 
     def on_close(self, ws, close_status_code, close_msg):
         """WebSocket关闭处理"""
-        print("🔌 WebSocket连接关闭")
+        print("WebSocket连接关闭")
 
     def on_open(self, ws):
         """WebSocket连接打开处理"""
@@ -116,7 +116,7 @@ class SparkAI:
                 }
             }
             ws.send(json.dumps(data))
-            print("📤 已发送请求到星火AI")
+            print("已发送请求到星火AI")
 
         thread.start_new_thread(run, ())
 
@@ -126,7 +126,7 @@ class SparkAI:
         self.answer = ""
         self.answer_received = False
         
-        print("🔄 连接讯飞星火AI...")
+        print("连接讯飞星火AI...")
         websocket.enableTrace(False)
         ws_url = self.create_url()
         ws = websocket.WebSocketApp(ws_url,
@@ -150,7 +150,7 @@ class SparkAI:
             time.sleep(0.1)
             
         if not self.answer_received:
-            print("⏰ 星火AI响应超时")
+            print("星火AI响应超时")
             
         return self.answer.strip()
 
@@ -175,7 +175,7 @@ class FreeAPIAnalysis:
 问题: {question}
 
 选项:
-{chr(10).join([f'{i+1}. {opt}' for i, opt in enumerate(options)])}
+{chr(10).join([f'{chr(65+i)}. {opt}' for i, opt in enumerate(options)])}
 
 基于文章内容，正确答案是选项:
 """
@@ -189,29 +189,29 @@ class FreeAPIAnalysis:
                 }
             }
             
-            print("🔄 调用Hugging Face API...")
+            print("调用Hugging Face API...")
             response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
             
             if response.status_code == 200:
                 result = response.json()
                 answer_text = result[0]['generated_text']
-                print(f"🤗 Hugging Face 分析结果: {answer_text}")
+                print(f"Hugging Face 分析结果: {answer_text}")
                 
-                # 解析答案
+                # 解析答案 - 支持A到E的选项
                 for i in range(len(options)):
-                    if str(i+1) in answer_text:
+                    if chr(65+i) in answer_text.upper():  # A, B, C, D, E
                         return i
             else:
-                print(f"❌ Hugging Face API 错误: {response.status_code}")
+                print(f"Hugging Face API 错误: {response.status_code}")
                 
         except Exception as e:
-            print(f"❌ Hugging Face API 调用失败: {e}")
+            print(f"Hugging Face API 调用失败: {e}")
         
         return -1  # 表示分析失败
     
     def analyze_with_keywords(self, article: str, question: str, options: List[str]) -> int:
         """基于关键词的分析方法"""
-        print("🔍 使用关键词分析...")
+        print("使用关键词分析...")
         article_lower = article.lower()
         question_lower = question.lower()
         
@@ -244,10 +244,10 @@ class FreeAPIAnalysis:
                         score += 3
             
             scores.append(score)
-            print(f"  选项 {i+1} 关键词得分: {score}")
+            print(f"  选项 {chr(65+i)} 关键词得分: {score}")
         
         best_index = scores.index(max(scores))
-        print(f"✅ 关键词分析选择: 选项 {best_index + 1}")
+        print(f"关键词分析选择: 选项 {chr(65+best_index)}")
         return best_index
     
     def analyze_with_free_api(self, article: str, question: str, options: List[str]) -> int:
@@ -273,10 +273,10 @@ class HybridReadTheoryBot:
         
         if all([spark_appid, spark_api_key, spark_api_secret]):
             self.spark_client = SparkAI(spark_appid, spark_api_key, spark_api_secret)
-            print("✅ 讯飞星火AI客户端初始化成功")
+            print("讯飞星火AI客户端初始化成功")
         else:
             self.spark_client = None
-            print("⚠️  讯飞星火AI客户端未配置")
+            print("讯飞星火AI客户端未配置")
             
         self.article_content = ""
         self.questions_answered = 0
@@ -321,7 +321,7 @@ class HybridReadTheoryBot:
                     options.binary_location = path
                     break
         
-        print("🔄 启动Chrome浏览器...")
+        print("启动Chrome浏览器...")
         try:
             # 增加超时时间
             from selenium.webdriver.chrome.service import Service
@@ -333,20 +333,59 @@ class HybridReadTheoryBot:
             
             # 设置更长的等待时间
             self.wait = WebDriverWait(self.driver, 30)
-            print("✅ Chrome浏览器启动成功")
+            print("Chrome浏览器启动成功")
             
         except WebDriverException as e:
-            print(f"❌ ChromeDriver启动失败: {e}")
-            print("💡 请检查：")
+            print(f"ChromeDriver启动失败: {e}")
+            print("请检查：")
             print("   1. Chrome浏览器是否已安装")
             print("   2. ChromeDriver版本是否与Chrome匹配")
             print("   3. 是否已正确安装ChromeDriver")
             print("   4. 尝试运行: pip install --upgrade selenium")
             raise
 
+    def handle_pretest_screen(self):
+        """处理预测试界面"""
+        print("检查预测试界面...")
+        try:
+            # 等待页面加载
+            time.sleep(5)
+            
+            # 查找"I'm Ready"按钮的各种可能选择器
+            ready_selectors = [
+                "//button[contains(text(), 'I am Ready')]",
+                "//button[contains(text(), \"I'm Ready\")]",
+                "//button[contains(text(), 'Ready')]",
+                "//button[contains(., 'Ready')]",
+                "//*[contains(text(), 'I am Ready')]",
+                "//*[contains(text(), \"I'm Ready\")]",
+                "//input[@value='I am Ready']",
+                "//input[@value=\"I'm Ready\"]",
+                "//a[contains(text(), 'I am Ready')]",
+                "//a[contains(text(), \"I'm Ready\")]"
+            ]
+            
+            for selector in ready_selectors:
+                try:
+                    ready_button = self.driver.find_element(By.XPATH, selector)
+                    if ready_button.is_displayed() and ready_button.is_enabled():
+                        print(f"找到'I'm Ready'按钮，点击开始测试...")
+                        ready_button.click()
+                        time.sleep(5)  # 等待页面跳转
+                        return True
+                except:
+                    continue
+            
+            print("未找到预测试界面，继续正常流程...")
+            return False
+            
+        except Exception as e:
+            print(f"处理预测试界面时出错: {e}")
+            return False
+
     def login(self, username: str, password: str):
         """登录ReadTheory"""
-        print("🚀 正在登录ReadTheory...")
+        print("正在登录ReadTheory...")
         
         max_retries = 3
         for attempt in range(max_retries):
@@ -373,33 +412,39 @@ class HybridReadTheoryBot:
                 # 检查登录是否成功
                 current_url = self.driver.current_url
                 if "dashboard" in current_url or "app" in current_url or "quiz" in current_url:
-                    print("✅ 登录成功")
+                    print("登录成功")
+                    
+                    # 登录成功后检查是否有预测试界面
+                    self.handle_pretest_screen()
                     return True
                 else:
                     # 检查是否有错误信息
                     error_elements = self.driver.find_elements(By.XPATH, '//*[contains(text(), "error") or contains(text(), "invalid") or contains(text(), "incorrect")]')
                     if error_elements:
-                        print("❌ 登录失败：用户名或密码错误")
+                        print("登录失败：用户名或密码错误")
                         return False
                     else:
                         # 可能是页面跳转延迟，再等待一下
                         time.sleep(3)
                         current_url = self.driver.current_url
                         if "dashboard" in current_url or "app" in current_url or "quiz" in current_url:
-                            print("✅ 登录成功（延迟验证）")
+                            print("登录成功（延迟验证）")
+                            
+                            # 登录成功后检查是否有预测试界面
+                            self.handle_pretest_screen()
                             return True
                         else:
-                            print(f"⚠️ 登录状态不确定，当前页面: {current_url}")
+                            print(f"登录状态不确定，当前页面: {current_url}")
                             # 继续尝试
                             continue
                             
             except Exception as e:
-                print(f"❌ 登录尝试 {attempt + 1} 失败: {e}")
+                print(f"登录尝试 {attempt + 1} 失败: {e}")
                 if attempt < max_retries - 1:
-                    print("🔄 重新尝试登录...")
+                    print("重新尝试登录...")
                     time.sleep(5)
                 else:
-                    print("❌ 所有登录尝试都失败了")
+                    print("所有登录尝试都失败了")
                     return False
         
         return False
@@ -410,30 +455,58 @@ class HybridReadTheoryBot:
             # 等待页面加载
             time.sleep(5)
             
+            # 首先检查是否还在预测试界面
+            if self.check_if_pretest_screen():
+                print("检测到预测试题目，开始答题...")
+            
             # 提取文章
             article_element = self.wait.until(
                 EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "passage")]'))
             )
             self.article_content = article_element.text
-            print(f"📖 文章长度: {len(self.article_content)} 字符")
+            print(f"文章长度: {len(self.article_content)} 字符")
 
             # 提取问题
             question_element = self.driver.find_element(By.XPATH, '//div[contains(@class, "question")]')
             question_text = question_element.text
-            print(f"❓ 问题: {question_text}")
+            print(f"问题: {question_text}")
 
-            # 提取选项
+            # 提取选项 - 支持A到E的选项
             options = self.driver.find_elements(By.XPATH, '//div[contains(@class, "answer-card")]')
             option_texts = [option.text.strip() for option in options if option.text.strip()]
             
+            # 如果选项数量超过5个，只取前5个（A到E）
+            if len(option_texts) > 5:
+                option_texts = option_texts[:5]
+                print("检测到超过5个选项，只取前5个选项")
+            
             for i, option in enumerate(option_texts):
-                print(f"   {i+1}. {option}")
+                print(f"  {chr(65+i)}. {option}")
 
             return self.article_content, question_text, option_texts
             
         except Exception as e:
-            print(f"❌ 内容提取失败: {e}")
+            print(f"内容提取失败: {e}")
             return None, None, None
+
+    def check_if_pretest_screen(self):
+        """检查是否在预测试界面"""
+        try:
+            # 检查预测试相关的文本
+            pretest_indicators = [
+                "//*[contains(text(), 'pretest')]",
+                "//*[contains(text(), '8 questions')]",
+                "//*[contains(text(), '20 minutes')]",
+                "//*[contains(text(), 'difficulty based on your answers')]"
+            ]
+            
+            for indicator in pretest_indicators:
+                elements = self.driver.find_elements(By.XPATH, indicator)
+                if elements:
+                    return True
+            return False
+        except:
+            return False
 
     def analyze_with_spark(self, article: str, question: str, options: List[str]) -> int:
         """使用讯飞星火AI分析文章和问题"""
@@ -453,9 +526,9 @@ class HybridReadTheoryBot:
 {question}
 
 【选项】
-{chr(10).join([f'{i+1}. {option}' for i, option in enumerate(options)])}
+{chr(10).join([f'{chr(65+i)}. {option}' for i, option in enumerate(options)])}
 
-请仔细分析文章内容，选择最符合文章意思的选项。只返回选项数字（1, 2, 3, 或4），不要包含其他任何文字。"""
+请仔细分析文章内容，选择最符合文章意思的选项。只返回选项字母（A, B, C, D, 或E），不要包含其他任何文字。"""
             
             messages = [
                 {
@@ -464,44 +537,44 @@ class HybridReadTheoryBot:
                 }
             ]
             
-            print("🔄 调用讯飞星火API...")
+            print("调用讯飞星火API...")
             answer = self.spark_client.chat_completion(messages)
-            print(f"✨ 星火AI最终分析结果: {answer}")
+            print(f"星火AI最终分析结果: {answer}")
             
-            # 解析答案
+            # 解析答案 - 支持A到E的选项
             for i in range(len(options)):
-                if str(i+1) in answer:
+                if chr(65+i) in answer.upper():  # A, B, C, D, E
                     return i
                     
             return -1
             
         except Exception as e:
-            print(f"❌ 星火AI分析失败: {e}")
+            print(f"星火AI分析失败: {e}")
             return -1
 
     def smart_analysis(self, article: str, question: str, options: List[str]) -> int:
         """智能分析策略"""
-        print("🧠 开始智能分析...")
+        print("开始智能分析...")
         
         # 策略1: 优先使用讯飞星火AI分析（如果可用）
         if self.spark_client:
-            print("🎯 尝试使用讯飞星火AI分析...")
+            print("尝试使用讯飞星火AI分析...")
             spark_result = self.analyze_with_spark(article, question, options)
             if spark_result != -1:
                 self.analysis_methods_used.append("SparkAI")
                 return spark_result
             else:
-                print("❌ 星火AI分析失败，尝试备用方案...")
+                print("星火AI分析失败，尝试备用方案...")
         
         # 策略2: 使用Hugging Face API分析
-        print("🎯 尝试使用Hugging Face分析...")
+        print("尝试使用Hugging Face分析...")
         free_api_result = self.free_analyzer.analyze_with_free_api(article, question, options)
         if free_api_result != -1:
             self.analysis_methods_used.append("HuggingFace")
             return free_api_result
         
         # 策略3: 关键词分析作为最终回退
-        print("🎯 使用关键词分析...")
+        print("使用关键词分析...")
         keyword_result = self.free_analyzer.analyze_with_keywords(article, question, options)
         self.analysis_methods_used.append("Keyword")
         return keyword_result
@@ -512,14 +585,14 @@ class HybridReadTheoryBot:
             # 提取内容
             article, question, options = self.extract_content()
             if not all([article, question, options]) or len(options) < 2:
-                print("❌ 内容提取不完整")
+                print("内容提取不完整")
                 return False
 
             # 智能分析选择最佳答案
             best_option_index = self.smart_analysis(article, question, options)
             method_used = self.analysis_methods_used[-1] if self.analysis_methods_used else "Unknown"
             
-            print(f"✅ 使用{method_used}分析，选择: 选项 {best_option_index + 1}")
+            print(f"使用{method_used}分析，选择: 选项 {chr(65+best_option_index)}")
 
             # 点击选择答案
             option_elements = self.driver.find_elements(By.XPATH, '//div[contains(@class, "answer-card")]')
@@ -535,27 +608,38 @@ class HybridReadTheoryBot:
             return False
 
         except Exception as e:
-            print(f"❌ 答题过程出错: {e}")
+            print(f"答题过程出错: {e}")
             return False
 
     def submit_answer(self) -> bool:
         """提交答案"""
         try:
-            submit_button = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, '/html/body/div[3]/div[3]/div/div[2]/div[2]/div[2]/div[3]/div[2]'))
-            )
-            submit_button.click()
-            print("📤 答案已提交")
-            time.sleep(3)
+            # 尝试多种提交按钮选择器
+            submit_selectors = [
+                '/html/body/div[3]/div[3]/div/div[2]/div[2]/div[2]/div[3]/div[2]',
+                "//button[contains(text(), 'Submit')]",
+                "//button[contains(text(), '提交')]",
+                "//input[@type='submit']",
+                "//button[@type='submit']"
+            ]
             
-            # 检查答案是否正确
-            if self.check_answer_correctness():
-                self.correct_answers += 1
-                
-            return True
+            for selector in submit_selectors:
+                try:
+                    submit_button = self.wait.until(
+                        EC.element_to_be_clickable((By.XPATH, selector))
+                    )
+                    submit_button.click()
+                    print("答案已提交")
+                    time.sleep(3)
+                    return True
+                except:
+                    continue
+            
+            print("未找到提交按钮")
+            return False
             
         except Exception as e:
-            print(f"❌ 提交答案失败: {e}")
+            print(f"提交答案失败: {e}")
             return False
 
     def check_answer_correctness(self) -> bool:
@@ -564,39 +648,55 @@ class HybridReadTheoryBot:
             # 查找正确提示
             correct_elements = self.driver.find_elements(By.XPATH, '//*[contains(text(), "correct") or contains(text(), "正确")]')
             if correct_elements:
-                print("🎉 回答正确!")
+                print("回答正确!")
                 return True
                 
             # 查找错误提示
             incorrect_elements = self.driver.find_elements(By.XPATH, '//*[contains(text(), "incorrect") or contains(text(), "错误")]')
             if incorrect_elements:
-                print("😞 回答错误")
+                print("回答错误")
                 return False
                 
             # 通过样式判断
             correct_styled = self.driver.find_elements(By.XPATH, '//*[contains(@class, "correct")]')
             if correct_styled:
-                print("🎉 回答正确!")
+                print("回答正确!")
                 return True
                 
         except:
             pass
             
-        print("❓ 无法确定答案正确性")
+        print("无法确定答案正确性")
         return False
 
     def click_next(self):
         """点击下一题"""
         try:
-            next_button = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, '/html/body/div[3]/div[3]/div/div[2]/div[2]/div[2]/div[3]/div[1]'))
-            )
-            next_button.click()
-            print("➡️ 进入下一题")
-            time.sleep(3)
-            return True
+            # 尝试多种下一题按钮选择器
+            next_selectors = [
+                '/html/body/div[3]/div[3]/div/div[2]/div[2]/div[2]/div[3]/div[1]',
+                "//button[contains(text(), 'Next')]",
+                "//button[contains(text(), '下一题')]",
+                "//a[contains(text(), 'Next')]"
+            ]
+            
+            for selector in next_selectors:
+                try:
+                    next_button = self.wait.until(
+                        EC.element_to_be_clickable((By.XPATH, selector))
+                    )
+                    next_button.click()
+                    print("进入下一题")
+                    time.sleep(3)
+                    return True
+                except:
+                    continue
+            
+            print("未找到下一题按钮")
+            return False
+            
         except Exception as e:
-            print(f"❌ 点击下一题失败: {e}")
+            print(f"点击下一题失败: {e}")
             return False
 
     def get_statistics(self) -> dict:
@@ -618,54 +718,54 @@ class HybridReadTheoryBot:
 
     def run(self, username: str, password: str, num_quizzes: int = 20):
         """运行主程序"""
-        print("🚀 启动混合模式ReadTheory自动化程序")
+        print("启动混合模式ReadTheory自动化程序")
         print("=" * 50)
-        print(f"📊 目标: 完成 {num_quizzes} 个测验")
-        print(f"🔑 讯飞星火AI: {'已配置' if self.spark_client else '未配置'}")
-        print(f"🔑 Hugging Face: {'已配置' if self.free_analyzer.huggingface_token else '未配置'}")
+        print(f"目标: 完成 {num_quizzes} 个测验")
+        print(f"讯飞星火AI: {'已配置' if self.spark_client else '未配置'}")
+        print(f"Hugging Face: {'已配置' if self.free_analyzer.huggingface_token else '未配置'}")
         print("=" * 50)
         
         try:
             # 尝试登录
             login_success = self.login(username, password)
             if not login_success:
-                print("❌ 登录失败，程序退出")
+                print("登录失败，程序退出")
                 return
             
             for quiz_num in range(1, num_quizzes + 1):
-                print(f"\n📊 进度: {quiz_num}/{num_quizzes}")
+                print(f"\n进度: {quiz_num}/{num_quizzes}")
                 print("-" * 30)
                 
                 if self.answer_question():
                     # 获取当前统计
                     stats = self.get_statistics()
-                    print(f"📈 当前准确率: {stats['accuracy']}%")
-                    print(f"🔧 分析方法: {stats['methods_used']}")
+                    print(f"当前准确率: {stats['accuracy']}%")
+                    print(f"分析方法: {stats['methods_used']}")
                     
                     # 点击下一题
                     if not self.click_next():
-                        print("🔄 刷新页面...")
+                        print("刷新页面...")
                         self.driver.refresh()
                         
                     # 随机延迟，避免被检测
                     delay = random.uniform(5, 10)
-                    print(f"⏳ 等待 {delay:.1f} 秒...")
+                    print(f"等待 {delay:.1f} 秒...")
                     time.sleep(delay)
                     
                 else:
-                    print("🔄 答题失败，刷新页面重试...")
+                    print("答题失败，刷新页面重试...")
                     self.driver.refresh()
                     time.sleep(5)
                     
         except KeyboardInterrupt:
-            print("\n⏹️ 用户中断程序")
+            print("\n用户中断程序")
         except Exception as e:
-            print(f"❌ 程序运行出错: {e}")
+            print(f"程序运行出错: {e}")
         finally:
             # 输出最终统计
             final_stats = self.get_statistics()
             print("\n" + "=" * 50)
-            print("🎯 程序完成统计:")
+            print("程序完成统计:")
             print(f"   总答题数: {final_stats['total_questions']}")
             print(f"   正确答题: {final_stats['correct_answers']}")
             print(f"   准确率: {final_stats['accuracy']}%")
@@ -677,17 +777,17 @@ class HybridReadTheoryBot:
 
 def get_user_credentials():
     """获取用户输入的凭据"""
-    print("\n🔐 请输入ReadTheory登录信息")
+    print("\n请输入ReadTheory登录信息")
     print("-" * 30)
     
     username = input("请输入用户名: ").strip()
     if not username:
-        print("❌ 用户名不能为空")
+        print("用户名不能为空")
         return None, None
         
     password = getpass.getpass("请输入密码: ").strip()
     if not password:
-        print("❌ 密码不能为空")
+        print("密码不能为空")
         return None, None
         
     return username, password
@@ -695,17 +795,17 @@ def get_user_credentials():
 def check_chromedriver():
     """检查ChromeDriver是否可用"""
     try:
-        print("🔍 检查ChromeDriver...")
+        print("检查ChromeDriver...")
         options = webdriver.ChromeOptions()
         options.add_argument('--headless')  # 无头模式检查
         driver = webdriver.Chrome(options=options)
         driver.quit()
-        print("✅ ChromeDriver检查通过")
+        print("ChromeDriver检查通过")
         return True
     except Exception as e:
-        print(f"❌ ChromeDriver检查失败: {e}")
-        print("💡 请运行: pip install --upgrade selenium")
-        print("💡 或下载匹配的ChromeDriver: https://chromedriver.chromium.org/")
+        print(f"ChromeDriver检查失败: {e}")
+        print("请运行: pip install --upgrade selenium")
+        print("或下载匹配的ChromeDriver: https://chromedriver.chromium.org/")
         return False
 
 def main():
@@ -734,10 +834,10 @@ def main():
         "spark_appid": "",
         "spark_api_key": "",
         "spark_api_secret": "",
-        "huggingface_token": ""
+        "huggingface_token": "_"
     }
     
-    print("\n🔄 初始化机器人...")
+    print("\n初始化机器人...")
     
     try:
         # 创建机器人实例
@@ -751,8 +851,8 @@ def main():
         # 运行程序
         bot.run(username, password, num_quizzes)
     except Exception as e:
-        print(f"❌ 程序执行失败: {e}")
-        print("💡 可能的解决方案:")
+        print(f"程序执行失败: {e}")
+        print("可能的解决方案:")
         print("   1. 检查网络连接")
         print("   2. 确保Chrome浏览器已安装")
         print("   3. 重新安装ChromeDriver")
