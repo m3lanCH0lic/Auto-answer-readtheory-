@@ -23,6 +23,125 @@ from wsgiref.handlers import format_date_time
 import getpass
 import sys
 import os
+import math
+from sklearn.feature_extraction.text import TfidfVectorizer
+import numpy as np
+
+class EnhancedElementFinder:
+    """增强的元素查找器，使用多种定位策略"""
+    
+    def __init__(self, driver, timeout=30):
+        self.driver = driver
+        self.timeout = timeout
+        self.wait = WebDriverWait(driver, timeout)
+    
+    def find_element_with_retry(self, selectors, description="元素"):
+        """
+        使用多种选择器重试查找元素
+        selectors: 选择器列表，每个选择器是(by, value)元组或XPath字符串
+        """
+        for attempt in range(3):
+            try:
+                for selector in selectors:
+                    try:
+                        if isinstance(selector, tuple):
+                            by, value = selector
+                            element = self.wait.until(EC.presence_of_element_located((by, value)))
+                        else:
+                            element = self.wait.until(EC.presence_of_element_located((By.XPATH, selector)))
+                        
+                        if element.is_displayed():
+                            return element
+                    except:
+                        continue
+                
+                # 如果所有选择器都失败，等待后重试
+                if attempt < 2:
+                    time.sleep(2)
+                    
+            except Exception as e:
+                if attempt == 2:
+                    print(f"查找{description}失败: {e}")
+        
+        return None
+    
+    def find_clickable_with_retry(self, selectors, description="元素"):
+        """查找可点击元素"""
+        for attempt in range(3):
+            try:
+                for selector in selectors:
+                    try:
+                        if isinstance(selector, tuple):
+                            by, value = selector
+                            element = self.wait.until(EC.element_to_be_clickable((by, value)))
+                        else:
+                            element = self.wait.until(EC.element_to_be_clickable((By.XPATH, selector)))
+                        return element
+                    except:
+                        continue
+                
+                if attempt < 2:
+                    time.sleep(2)
+                    
+            except Exception as e:
+                if attempt == 2:
+                    print(f"查找可点击{description}失败: {e}")
+        
+        return None
+
+class TFIDFAnalyzer:
+    """基于TF-IDF的文本分析器"""
+    
+    def __init__(self):
+        self.vectorizer = TfidfVectorizer(stop_words='english', max_features=1000)
+    
+    def calculate_similarity(self, article, options):
+        """计算文章与选项的相似度"""
+        try:
+            # 准备文本数据
+            texts = [article] + options
+            
+            # 计算TF-IDF矩阵
+            tfidf_matrix = self.vectorizer.fit_transform(texts)
+            
+            # 计算文章与每个选项的余弦相似度
+            article_vector = tfidf_matrix[0]
+            similarities = []
+            
+            for i in range(1, len(texts)):
+                option_vector = tfidf_matrix[i]
+                similarity = self.cosine_similarity(article_vector, option_vector)
+                similarities.append(similarity)
+            
+            return similarities
+            
+        except Exception as e:
+            print(f"TF-IDF分析失败: {e}")
+            # 回退到简单关键词匹配
+            return self.fallback_keyword_match(article, options)
+    
+    def cosine_similarity(self, vec1, vec2):
+        """计算余弦相似度"""
+        return (vec1 * vec2.T).toarray()[0][0] / (np.linalg.norm(vec1.toarray()) * np.linalg.norm(vec2.toarray()) + 1e-8)
+    
+    def fallback_keyword_match(self, article, options):
+        """回退的关键词匹配方法"""
+        article_lower = article.lower()
+        article_words = set(re.findall(r'\b\w+\b', article_lower))
+        
+        scores = []
+        for option in options:
+            option_lower = option.lower()
+            option_words = set(re.findall(r'\b\w+\b', option_lower))
+            
+            # 计算Jaccard相似度
+            intersection = len(article_words.intersection(option_words))
+            union = len(article_words.union(option_words))
+            similarity = intersection / union if union > 0 else 0
+            
+            scores.append(similarity)
+        
+        return scores
 
 class SparkAI:
     """讯飞星火AI客户端"""
@@ -37,16 +156,13 @@ class SparkAI:
         
     def create_url(self):
         """生成鉴权URL"""
-        # 生成RFC1123格式的时间戳
         now = datetime.now()
         date = format_date_time(mktime(now.timetuple()))
         
-        # 拼接字符串
         signature_origin = "host: " + "spark-api.xf-yun.com" + "\n"
         signature_origin += "date: " + date + "\n"
         signature_origin += "GET " + "/v3.5/chat " + "HTTP/1.1"
         
-        # 进行hmac-sha256进行加密
         signature_sha = hmac.new(self.api_secret.encode('utf-8'), 
                                 signature_origin.encode('utf-8'), 
                                 digestmod=hashlib.sha256).digest()
@@ -56,13 +172,11 @@ class SparkAI:
         authorization_origin = f'api_key="{self.api_key}", algorithm="hmac-sha256", headers="host date request-line", signature="{signature_sha_base64}"'
         authorization = base64.b64encode(authorization_origin.encode('utf-8')).decode(encoding='utf-8')
         
-        # 将请求的鉴权参数组合为字典
         v = {
             "authorization": authorization,
             "date": date,
             "host": "spark-api.xf-yun.com"
         }
-        # 拼接鉴权参数，生成url
         url = self.url + '?' + urlencode(v)
         return url
 
@@ -96,7 +210,6 @@ class SparkAI:
     def on_open(self, ws):
         """WebSocket连接打开处理"""
         def run(*args):
-            # 构建请求数据
             data = {
                 "header": {
                     "app_id": self.appid,
@@ -135,7 +248,6 @@ class SparkAI:
                                   on_close=self.on_close)
         ws.on_open = self.on_open
         
-        # 在新线程中运行WebSocket
         def run_websocket():
             ws.run_forever()
         
@@ -143,8 +255,7 @@ class SparkAI:
         websocket_thread.daemon = True
         websocket_thread.start()
         
-        # 等待回答完成
-        timeout = 30  # 30秒超时
+        timeout = 30
         start_time = time.time()
         while not self.answer_received and (time.time() - start_time) < timeout:
             time.sleep(0.1)
@@ -159,6 +270,7 @@ class FreeAPIAnalysis:
     
     def __init__(self, huggingface_token: str = None):
         self.huggingface_token = huggingface_token
+        self.tfidf_analyzer = TFIDFAnalyzer()
     
     def analyze_with_huggingface(self, article: str, question: str, options: List[str]) -> int:
         """使用Hugging Face API进行分析"""
@@ -166,7 +278,6 @@ class FreeAPIAnalysis:
             API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-xl"
             headers = {"Authorization": f"Bearer {self.huggingface_token}"} if self.huggingface_token else {}
             
-            # 构建提示词
             prompt = f"""
 阅读以下文章并回答问题：
 
@@ -197,9 +308,8 @@ class FreeAPIAnalysis:
                 answer_text = result[0]['generated_text']
                 print(f"Hugging Face 分析结果: {answer_text}")
                 
-                # 解析答案 - 支持A到E的选项
                 for i in range(len(options)):
-                    if chr(65+i) in answer_text.upper():  # A, B, C, D, E
+                    if chr(65+i) in answer_text.upper():
                         return i
             else:
                 print(f"Hugging Face API 错误: {response.status_code}")
@@ -207,19 +317,46 @@ class FreeAPIAnalysis:
         except Exception as e:
             print(f"Hugging Face API 调用失败: {e}")
         
-        return -1  # 表示分析失败
+        return -1
     
-    def analyze_with_keywords(self, article: str, question: str, options: List[str]) -> int:
-        """基于关键词的分析方法"""
-        print("使用关键词分析...")
+    def analyze_with_tfidf(self, article: str, question: str, options: List[str]) -> int:
+        """使用TF-IDF分析文章和选项的相似度"""
+        print("使用TF-IDF分析...")
+        
+        try:
+            # 计算相似度
+            similarities = self.tfidf_analyzer.calculate_similarity(article, options)
+            
+            # 显示每个选项的相似度得分
+            for i, similarity in enumerate(similarities):
+                print(f"  选项 {chr(65+i)} TF-IDF相似度: {similarity:.4f}")
+            
+            # 选择相似度最高的选项
+            best_index = np.argmax(similarities)
+            print(f"TF-IDF分析选择: 选项 {chr(65+best_index)}")
+            return best_index
+            
+        except Exception as e:
+            print(f"TF-IDF分析失败: {e}")
+            return self.analyze_with_enhanced_keywords(article, question, options)
+    
+    def analyze_with_enhanced_keywords(self, article: str, question: str, options: List[str]) -> int:
+        """增强的关键词分析方法"""
+        print("使用增强关键词分析...")
         article_lower = article.lower()
         question_lower = question.lower()
         
-        # 提取文章中的关键词（去除常见停用词）
-        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'}
+        # 提取关键词，考虑词频和重要性
         words = re.findall(r'\b\w+\b', article_lower)
-        word_freq = Counter([word for word in words if word not in stop_words and len(word) > 2])
-        important_words = set([word for word, freq in word_freq.most_common(20)])
+        word_freq = Counter([word for word in words if len(word) > 2])
+        
+        # 计算TF-IDF风格的权重
+        total_words = len(words)
+        important_words = {}
+        for word, freq in word_freq.most_common(50):
+            # 简单的TF-IDF近似计算
+            tf = freq / total_words
+            important_words[word] = tf * math.log(total_words / (freq + 1))
         
         scores = []
         
@@ -228,27 +365,43 @@ class FreeAPIAnalysis:
             option_lower = option.lower()
             option_words = set(re.findall(r'\b\w+\b', option_lower))
             
-            # 计算与重要词汇的重叠
-            common_words = option_words.intersection(important_words)
-            score += len(common_words) * 2
+            # 基于TF-IDF权重的关键词匹配
+            for word in option_words:
+                if word in important_words:
+                    score += important_words[word] * 10
             
-            # 检查选项是否在文章中直接出现
-            if option_lower in article_lower:
-                score += 10
-            
-            # 对于细节题，检查具体信息匹配
-            if any(word in question_lower for word in ['according to', 'the passage states', 'the author says']):
-                # 计算选项与文章的相似度
+            # 考虑问题类型
+            question_type = self.analyze_question_type(question_lower)
+            if question_type == "detail":
+                # 细节题：检查具体信息匹配
                 for sentence in article_lower.split('.'):
-                    if any(word in sentence for word in option_words):
-                        score += 3
+                    sentence_words = set(re.findall(r'\b\w+\b', sentence))
+                    common_words = option_words.intersection(sentence_words)
+                    if len(common_words) >= 2:
+                        score += len(common_words) * 3
+            elif question_type == "main_idea":
+                # 主旨题：关注高频词汇
+                for word in option_words:
+                    if word in [w for w, _ in word_freq.most_common(10)]:
+                        score += 5
             
             scores.append(score)
-            print(f"  选项 {chr(65+i)} 关键词得分: {score}")
+            print(f"  选项 {chr(65+i)} 增强关键词得分: {score:.2f}")
         
         best_index = scores.index(max(scores))
-        print(f"关键词分析选择: 选项 {chr(65+best_index)}")
+        print(f"增强关键词分析选择: 选项 {chr(65+best_index)}")
         return best_index
+    
+    def analyze_question_type(self, question_lower: str) -> str:
+        """分析问题类型"""
+        if any(word in question_lower for word in ['main idea', 'main purpose', 'primarily about', 'mainly']):
+            return "main_idea"
+        elif any(word in question_lower for word in ['according to', 'the passage states', 'the author says', 'based on the passage']):
+            return "detail"
+        elif any(word in question_lower for word in ['infer', 'suggest', 'implies', 'probably']):
+            return "inference"
+        else:
+            return "general"
     
     def analyze_with_free_api(self, article: str, question: str, options: List[str]) -> int:
         """免费API分析主方法"""
@@ -258,8 +411,13 @@ class FreeAPIAnalysis:
             if result != -1:
                 return result
         
-        # 回退到关键词分析
-        return self.analyze_with_keywords(article, question, options)
+        # 使用TF-IDF分析
+        tfidf_result = self.analyze_with_tfidf(article, question, options)
+        if tfidf_result != -1:
+            return tfidf_result
+        
+        # 回退到增强关键词分析
+        return self.analyze_with_enhanced_keywords(article, question, options)
 
 class HybridReadTheoryBot:
     """混合模式ReadTheory自动化机器人"""
@@ -270,6 +428,7 @@ class HybridReadTheoryBot:
         self.spark_api_key = spark_api_key
         self.spark_api_secret = spark_api_secret
         self.free_analyzer = FreeAPIAnalysis(huggingface_token)
+        self.element_finder = EnhancedElementFinder(self.driver, timeout=30)
         
         if all([spark_appid, spark_api_key, spark_api_secret]):
             self.spark_client = SparkAI(spark_appid, spark_api_key, spark_api_secret)
@@ -294,15 +453,13 @@ class HybridReadTheoryBot:
         options.add_argument('--disable-blink-features=AutomationControlled')
         options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
         options.add_experimental_option('useAutomationExtension', False)
-        
-        # 设置窗口大小
         options.add_argument('--window-size=1200,800')
         
-        # 尝试自动查找Chrome路径
+        # 自动查找Chrome路径
         import platform
         system = platform.system()
         
-        if system == "Darwin":  # macOS
+        if system == "Darwin":
             possible_paths = [
                 '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
                 '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary'
@@ -311,7 +468,7 @@ class HybridReadTheoryBot:
                 if os.path.exists(path):
                     options.binary_location = path
                     break
-        elif system == "Windows":  # Windows
+        elif system == "Windows":
             possible_paths = [
                 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
                 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
@@ -323,15 +480,13 @@ class HybridReadTheoryBot:
         
         print("启动Chrome浏览器...")
         try:
-            # 增加超时时间
             from selenium.webdriver.chrome.service import Service
             service = Service()
-            service.creationflags = 0x08000000  # 在Windows上避免控制台窗口
+            service.creationflags = 0x08000000
             
             self.driver = webdriver.Chrome(service=service, options=options)
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             
-            # 设置更长的等待时间
             self.wait = WebDriverWait(self.driver, 30)
             print("Chrome浏览器启动成功")
             
@@ -341,40 +496,30 @@ class HybridReadTheoryBot:
             print("   1. Chrome浏览器是否已安装")
             print("   2. ChromeDriver版本是否与Chrome匹配")
             print("   3. 是否已正确安装ChromeDriver")
-            print("   4. 尝试运行: pip install --upgrade selenium")
             raise
 
     def handle_pretest_screen(self):
         """处理预测试界面"""
         print("检查预测试界面...")
         try:
-            # 等待页面加载
             time.sleep(5)
             
-            # 查找"I'm Ready"按钮的各种可能选择器
+            # 使用多种选择器查找按钮
             ready_selectors = [
                 "//button[contains(text(), 'I am Ready')]",
                 "//button[contains(text(), \"I'm Ready\")]",
                 "//button[contains(text(), 'Ready')]",
-                "//button[contains(., 'Ready')]",
-                "//*[contains(text(), 'I am Ready')]",
-                "//*[contains(text(), \"I'm Ready\")]",
-                "//input[@value='I am Ready']",
-                "//input[@value=\"I'm Ready\"]",
-                "//a[contains(text(), 'I am Ready')]",
-                "//a[contains(text(), \"I'm Ready\")]"
+                (By.CSS_SELECTOR, "button:contains('Ready')"),
+                (By.CSS_SELECTOR, "input[value*='Ready']"),
+                (By.CSS_SELECTOR, "a:contains('Ready')")
             ]
             
-            for selector in ready_selectors:
-                try:
-                    ready_button = self.driver.find_element(By.XPATH, selector)
-                    if ready_button.is_displayed() and ready_button.is_enabled():
-                        print(f"找到'I'm Ready'按钮，点击开始测试...")
-                        ready_button.click()
-                        time.sleep(5)  # 等待页面跳转
-                        return True
-                except:
-                    continue
+            ready_button = self.element_finder.find_clickable_with_retry(ready_selectors, "I'm Ready按钮")
+            if ready_button:
+                print("找到'I'm Ready'按钮，点击开始测试...")
+                ready_button.click()
+                time.sleep(5)
+                return True
             
             print("未找到预测试界面，继续正常流程...")
             return False
@@ -391,51 +536,71 @@ class HybridReadTheoryBot:
         for attempt in range(max_retries):
             try:
                 self.driver.get('https://readtheory.org/auth/login')
-                time.sleep(5)  # 增加页面加载等待时间
+                time.sleep(5)
                 
-                username_field = self.wait.until(
-                    EC.presence_of_element_located((By.XPATH, '//*[@id="username"]'))
-                )
+                # 使用增强的元素查找器
+                username_selectors = [
+                    (By.XPATH, '//*[@id="username"]'),
+                    (By.CSS_SELECTOR, '#username'),
+                    (By.NAME, 'username'),
+                    (By.CSS_SELECTOR, 'input[type="text"]')
+                ]
+                
+                username_field = self.element_finder.find_element_with_retry(username_selectors, "用户名输入框")
+                if not username_field:
+                    continue
+                    
                 username_field.clear()
                 username_field.send_keys(username)
                 
-                password_field = self.driver.find_element(By.XPATH, '//*[@id="password"]')
+                password_selectors = [
+                    (By.XPATH, '//*[@id="password"]'),
+                    (By.CSS_SELECTOR, '#password'),
+                    (By.NAME, 'password'),
+                    (By.CSS_SELECTOR, 'input[type="password"]')
+                ]
+                
+                password_field = self.element_finder.find_element_with_retry(password_selectors, "密码输入框")
+                if not password_field:
+                    continue
+                    
                 password_field.clear()
                 password_field.send_keys(password)
                 
-                login_button = self.driver.find_element(By.XPATH, '//*[@id="ajaxLogin"]')
+                login_selectors = [
+                    (By.XPATH, '//*[@id="ajaxLogin"]'),
+                    (By.CSS_SELECTOR, '#ajaxLogin'),
+                    (By.CSS_SELECTOR, 'input[type="submit"]'),
+                    (By.CSS_SELECTOR, 'button[type="submit"]')
+                ]
+                
+                login_button = self.element_finder.find_clickable_with_retry(login_selectors, "登录按钮")
+                if not login_button:
+                    continue
+                    
                 login_button.click()
                 
-                # 等待登录完成
-                time.sleep(8)  # 增加登录等待时间
+                time.sleep(8)
                 
-                # 检查登录是否成功
                 current_url = self.driver.current_url
                 if "dashboard" in current_url or "app" in current_url or "quiz" in current_url:
                     print("登录成功")
-                    
-                    # 登录成功后检查是否有预测试界面
                     self.handle_pretest_screen()
                     return True
                 else:
-                    # 检查是否有错误信息
                     error_elements = self.driver.find_elements(By.XPATH, '//*[contains(text(), "error") or contains(text(), "invalid") or contains(text(), "incorrect")]')
                     if error_elements:
                         print("登录失败：用户名或密码错误")
                         return False
                     else:
-                        # 可能是页面跳转延迟，再等待一下
                         time.sleep(3)
                         current_url = self.driver.current_url
                         if "dashboard" in current_url or "app" in current_url or "quiz" in current_url:
                             print("登录成功（延迟验证）")
-                            
-                            # 登录成功后检查是否有预测试界面
                             self.handle_pretest_screen()
                             return True
                         else:
                             print(f"登录状态不确定，当前页面: {current_url}")
-                            # 继续尝试
                             continue
                             
             except Exception as e:
@@ -452,30 +617,51 @@ class HybridReadTheoryBot:
     def extract_content(self) -> Tuple[Optional[str], Optional[str], Optional[List[str]]]:
         """提取文章、问题和选项"""
         try:
-            # 等待页面加载
             time.sleep(5)
             
-            # 首先检查是否还在预测试界面
             if self.check_if_pretest_screen():
                 print("检测到预测试题目，开始答题...")
             
-            # 提取文章
-            article_element = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "passage")]'))
-            )
+            # 使用多种选择器查找文章
+            article_selectors = [
+                (By.XPATH, '//div[contains(@class, "passage")]'),
+                (By.CSS_SELECTOR, '.passage'),
+                (By.CSS_SELECTOR, '[class*="passage"]'),
+                (By.CSS_SELECTOR, '.reading-passage')
+            ]
+            
+            article_element = self.element_finder.find_element_with_retry(article_selectors, "文章内容")
+            if not article_element:
+                return None, None, None
+                
             self.article_content = article_element.text
             print(f"文章长度: {len(self.article_content)} 字符")
 
-            # 提取问题
-            question_element = self.driver.find_element(By.XPATH, '//div[contains(@class, "question")]')
+            # 查找问题
+            question_selectors = [
+                (By.XPATH, '//div[contains(@class, "question")]'),
+                (By.CSS_SELECTOR, '.question'),
+                (By.CSS_SELECTOR, '[class*="question"]')
+            ]
+            
+            question_element = self.element_finder.find_element_with_retry(question_selectors, "问题")
+            if not question_element:
+                return None, None, None
+                
             question_text = question_element.text
             print(f"问题: {question_text}")
 
-            # 提取选项 - 支持A到E的选项
-            options = self.driver.find_elements(By.XPATH, '//div[contains(@class, "answer-card")]')
+            # 查找选项
+            option_selectors = [
+                (By.XPATH, '//div[contains(@class, "answer-card")]'),
+                (By.CSS_SELECTOR, '.answer-card'),
+                (By.CSS_SELECTOR, '[class*="answer"]'),
+                (By.CSS_SELECTOR, '.choice')
+            ]
+            
+            options = self.driver.find_elements(*option_selectors[0])  # 使用第一个选择器
             option_texts = [option.text.strip() for option in options if option.text.strip()]
             
-            # 如果选项数量超过5个，只取前5个（A到E）
             if len(option_texts) > 5:
                 option_texts = option_texts[:5]
                 print("检测到超过5个选项，只取前5个选项")
@@ -492,7 +678,6 @@ class HybridReadTheoryBot:
     def check_if_pretest_screen(self):
         """检查是否在预测试界面"""
         try:
-            # 检查预测试相关的文本
             pretest_indicators = [
                 "//*[contains(text(), 'pretest')]",
                 "//*[contains(text(), '8 questions')]",
@@ -514,8 +699,7 @@ class HybridReadTheoryBot:
             return -1
             
         try:
-            # 构建提示词，限制文章长度以避免过长
-            truncated_article = article[:3000]  # 限制文章长度
+            truncated_article = article[:3000]
             
             prompt = f"""请仔细阅读以下文章并回答问题。请严格基于文章内容选择最准确的答案。
 
@@ -541,9 +725,8 @@ class HybridReadTheoryBot:
             answer = self.spark_client.chat_completion(messages)
             print(f"星火AI最终分析结果: {answer}")
             
-            # 解析答案 - 支持A到E的选项
             for i in range(len(options)):
-                if chr(65+i) in answer.upper():  # A, B, C, D, E
+                if chr(65+i) in answer.upper():
                     return i
                     
             return -1
@@ -556,7 +739,6 @@ class HybridReadTheoryBot:
         """智能分析策略"""
         print("开始智能分析...")
         
-        # 策略1: 优先使用讯飞星火AI分析（如果可用）
         if self.spark_client:
             print("尝试使用讯飞星火AI分析...")
             spark_result = self.analyze_with_spark(article, question, options)
@@ -566,41 +748,40 @@ class HybridReadTheoryBot:
             else:
                 print("星火AI分析失败，尝试备用方案...")
         
-        # 策略2: 使用Hugging Face API分析
-        print("尝试使用Hugging Face分析...")
+        print("尝试使用TF-IDF分析...")
         free_api_result = self.free_analyzer.analyze_with_free_api(article, question, options)
         if free_api_result != -1:
-            self.analysis_methods_used.append("HuggingFace")
+            self.analysis_methods_used.append("TFIDF")
             return free_api_result
         
-        # 策略3: 关键词分析作为最终回退
-        print("使用关键词分析...")
-        keyword_result = self.free_analyzer.analyze_with_keywords(article, question, options)
-        self.analysis_methods_used.append("Keyword")
+        print("使用增强关键词分析...")
+        keyword_result = self.free_analyzer.analyze_with_enhanced_keywords(article, question, options)
+        self.analysis_methods_used.append("EnhancedKeyword")
         return keyword_result
 
     def answer_question(self) -> bool:
         """回答单个问题"""
         try:
-            # 提取内容
             article, question, options = self.extract_content()
             if not all([article, question, options]) or len(options) < 2:
                 print("内容提取不完整")
                 return False
 
-            # 智能分析选择最佳答案
             best_option_index = self.smart_analysis(article, question, options)
             method_used = self.analysis_methods_used[-1] if self.analysis_methods_used else "Unknown"
             
             print(f"使用{method_used}分析，选择: 选项 {chr(65+best_option_index)}")
 
-            # 点击选择答案
-            option_elements = self.driver.find_elements(By.XPATH, '//div[contains(@class, "answer-card")]')
+            option_selectors = [
+                (By.XPATH, '//div[contains(@class, "answer-card")]'),
+                (By.CSS_SELECTOR, '.answer-card')
+            ]
+            
+            option_elements = self.driver.find_elements(*option_selectors[0])
             if best_option_index < len(option_elements):
                 option_elements[best_option_index].click()
                 time.sleep(2)
 
-                # 提交答案
                 if self.submit_answer():
                     self.questions_answered += 1
                     return True
@@ -614,26 +795,19 @@ class HybridReadTheoryBot:
     def submit_answer(self) -> bool:
         """提交答案"""
         try:
-            # 尝试多种提交按钮选择器
             submit_selectors = [
                 '/html/body/div[3]/div[3]/div/div[2]/div[2]/div[2]/div[3]/div[2]',
-                "//button[contains(text(), 'Submit')]",
-                "//button[contains(text(), '提交')]",
-                "//input[@type='submit']",
-                "//button[@type='submit']"
+                (By.XPATH, "//button[contains(text(), 'Submit')]"),
+                (By.CSS_SELECTOR, "button:contains('Submit')"),
+                (By.CSS_SELECTOR, "input[type='submit']")
             ]
             
-            for selector in submit_selectors:
-                try:
-                    submit_button = self.wait.until(
-                        EC.element_to_be_clickable((By.XPATH, selector))
-                    )
-                    submit_button.click()
-                    print("答案已提交")
-                    time.sleep(3)
-                    return True
-                except:
-                    continue
+            submit_button = self.element_finder.find_clickable_with_retry(submit_selectors, "提交按钮")
+            if submit_button:
+                submit_button.click()
+                print("答案已提交")
+                time.sleep(3)
+                return True
             
             print("未找到提交按钮")
             return False
@@ -645,19 +819,16 @@ class HybridReadTheoryBot:
     def check_answer_correctness(self) -> bool:
         """检查答案是否正确"""
         try:
-            # 查找正确提示
             correct_elements = self.driver.find_elements(By.XPATH, '//*[contains(text(), "correct") or contains(text(), "正确")]')
             if correct_elements:
                 print("回答正确!")
                 return True
                 
-            # 查找错误提示
             incorrect_elements = self.driver.find_elements(By.XPATH, '//*[contains(text(), "incorrect") or contains(text(), "错误")]')
             if incorrect_elements:
                 print("回答错误")
                 return False
                 
-            # 通过样式判断
             correct_styled = self.driver.find_elements(By.XPATH, '//*[contains(@class, "correct")]')
             if correct_styled:
                 print("回答正确!")
@@ -672,25 +843,19 @@ class HybridReadTheoryBot:
     def click_next(self):
         """点击下一题"""
         try:
-            # 尝试多种下一题按钮选择器
             next_selectors = [
                 '/html/body/div[3]/div[3]/div/div[2]/div[2]/div[2]/div[3]/div[1]',
-                "//button[contains(text(), 'Next')]",
-                "//button[contains(text(), '下一题')]",
-                "//a[contains(text(), 'Next')]"
+                (By.XPATH, "//button[contains(text(), 'Next')]"),
+                (By.CSS_SELECTOR, "button:contains('Next')"),
+                (By.CSS_SELECTOR, "a:contains('Next')")
             ]
             
-            for selector in next_selectors:
-                try:
-                    next_button = self.wait.until(
-                        EC.element_to_be_clickable((By.XPATH, selector))
-                    )
-                    next_button.click()
-                    print("进入下一题")
-                    time.sleep(3)
-                    return True
-                except:
-                    continue
+            next_button = self.element_finder.find_clickable_with_retry(next_selectors, "下一题按钮")
+            if next_button:
+                next_button.click()
+                print("进入下一题")
+                time.sleep(3)
+                return True
             
             print("未找到下一题按钮")
             return False
@@ -726,7 +891,6 @@ class HybridReadTheoryBot:
         print("=" * 50)
         
         try:
-            # 尝试登录
             login_success = self.login(username, password)
             if not login_success:
                 print("登录失败，程序退出")
@@ -737,17 +901,14 @@ class HybridReadTheoryBot:
                 print("-" * 30)
                 
                 if self.answer_question():
-                    # 获取当前统计
                     stats = self.get_statistics()
                     print(f"当前准确率: {stats['accuracy']}%")
                     print(f"分析方法: {stats['methods_used']}")
                     
-                    # 点击下一题
                     if not self.click_next():
                         print("刷新页面...")
                         self.driver.refresh()
                         
-                    # 随机延迟，避免被检测
                     delay = random.uniform(5, 10)
                     print(f"等待 {delay:.1f} 秒...")
                     time.sleep(delay)
@@ -762,7 +923,6 @@ class HybridReadTheoryBot:
         except Exception as e:
             print(f"程序运行出错: {e}")
         finally:
-            # 输出最终统计
             final_stats = self.get_statistics()
             print("\n" + "=" * 50)
             print("程序完成统计:")
@@ -797,7 +957,7 @@ def check_chromedriver():
     try:
         print("检查ChromeDriver...")
         options = webdriver.ChromeOptions()
-        options.add_argument('--headless')  # 无头模式检查
+        options.add_argument('--headless')
         driver = webdriver.Chrome(options=options)
         driver.quit()
         print("ChromeDriver检查通过")
@@ -813,34 +973,29 @@ def main():
     print("ReadTheory混合模式自动化机器人")
     print("=" * 50)
     
-    # 检查ChromeDriver
     if not check_chromedriver():
         return
     
-    # 获取用户登录信息
     username, password = get_user_credentials()
     if not username or not password:
         return
     
-    # 询问要完成的测验数量
     try:
         num_quizzes = input("要完成的测验数量 (默认20): ").strip()
         num_quizzes = int(num_quizzes) if num_quizzes.isdigit() else 20
     except:
         num_quizzes = 20
     
-    # 配置API密钥
     CONFIG = {
         "spark_appid": "",
         "spark_api_key": "",
         "spark_api_secret": "",
-        "huggingface_token": "_"
+        "huggingface_token": ""
     }
     
     print("\n初始化机器人...")
     
     try:
-        # 创建机器人实例
         bot = HybridReadTheoryBot(
             spark_appid=CONFIG["spark_appid"],
             spark_api_key=CONFIG["spark_api_key"],
@@ -848,7 +1003,6 @@ def main():
             huggingface_token=CONFIG["huggingface_token"]
         )
         
-        # 运行程序
         bot.run(username, password, num_quizzes)
     except Exception as e:
         print(f"程序执行失败: {e}")
