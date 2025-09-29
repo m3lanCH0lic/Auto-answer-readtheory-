@@ -1,133 +1,15 @@
-# Auto-answer-readtheory-
+# 语言/Language
 
-[English](#english-version) | [中文](#中文介绍)
-
----
-
-## <a name="english-version"></a >English Version
-
-This project is an intelligent automation answering bot for [ReadTheory](https://readtheory.org/), built with Python. It combines browser automation (Selenium), AI APIs (iFLYTEK Spark and HuggingFace), and text analysis to achieve end-to-end automation: login, content extraction, intelligent option analysis, and auto-answering, greatly improving quiz efficiency.
+- [中文说明](#中文说明)
+- [English Instructions](#english-instructions)
 
 ---
 
-### Features
+## 中文说明
 
-- **Automated login and answering:** Uses Selenium to control Chrome, automatically log in and answer questions on ReadTheory.
-- **Multiple intelligent analysis methods:**
-  - iFLYTEK Spark large language model (SparkAI)
-  - HuggingFace API smart analysis
-  - Keyword-based text analysis algorithm
-- **Real-time statistics:** Tracks total answered questions, accuracy, and analysis method usage.
-- **Supports Windows and macOS:** Chrome path is automatically adapted.
-- **Clean, modular code structure for easy extension.**
-
----
-
-### Environment Setup
-
-#### 1. Python Environment
-
-Python 3.8 or above is recommended.
-
-#### 2. Install Dependencies
-
-Required Python packages:
-
-```bash
-pip install selenium requests websocket-client
-```
-
-> Note: If you want to use HuggingFace or iFLYTEK Spark AI, you must register and obtain API tokens in advance.
-
-#### 3. Prepare Chrome Browser & Driver
-
-- Download and install [Google Chrome](https://www.google.com/chrome/)
-- Download the matching [ChromeDriver](https://chromedriver.chromium.org/downloads) and add it to your PATH or project directory.
-
----
-
-### Quick Start
-
-#### 1. Clone the Repository
-
-```bash
-git clone https://github.com/m3lanCH0lic/Auto-answer-readtheory-.git
-cd Auto-answer-readtheory-
-```
-
-#### 2. Configure API Keys (Optional)
-
-Edit `Main.py` and fill in your API info in the `CONFIG` dictionary:
-
-```python
-CONFIG = {
-    "spark_appid": "your_spark_appid",
-    "spark_api_key": "your_spark_api_key",
-    "spark_api_secret": "your_spark_api_secret",
-    "huggingface_token": "your_huggingface_token"
-}
-```
-
-If you don't need AI assistance, leave these blank: the script will fallback to keyword analysis.
-
-#### 3. Run the Script
-
-```bash
-python Main.py
-```
-
-#### 4. Interactive Usage
-
-- **Input Username and Password:** As prompted, enter your ReadTheory credentials (password will be hidden).
-- **Number of quizzes:** Enter how many quizzes to complete (default: 20).
-- The script will run automatically, showing progress, analysis method, and accuracy.
-- Supports keyboard interruption (Ctrl+C).
-
----
-
-### Key Technologies
-
-- **Selenium:** Browser automation.
-- **WebSocket:** Real-time communication with SparkAI API.
-- **requests:** Calls HuggingFace API for remote inference.
-- **Regex and text analysis:** Keyword-based fallback analysis.
-- **Multithreading:** Ensures WebSocket and main program run in parallel.
-- **Robust exception and timeout handling.**
-
----
-
-### FAQ
-
-1. **Login or answer failures?**
-   - Check your credentials, or if the webpage structure has changed.
-   - Ensure Chrome browser and driver versions match.
-
-2. **API call failures?**
-   - Check if your API keys are valid and the network is working.
-
-3. **Element location errors?**
-   - Likely due to changes in the website's frontend. XPath may need adjustment.
-
----
-
-### Disclaimer
-
-- This project is for learning and research purposes only. Commercial use or violating ReadTheory’s terms is strictly forbidden.
-- Use at your own risk; account safety is not guaranteed.
-
----
-
-### Contributing & Feedback
-
-Questions or suggestions? Please open an [Issue](https://github.com/m3lanCH0lic/Auto-answer-readtheory-/issues)!
-
----
-
-## <a name="中文介绍"></a >中文介绍
+### 项目简介
 
 本项目是一个基于 Python 的智能自动化答题机器人，专为 [ReadTheory](https://readtheory.org/) 英语阅读理解平台设计。它结合了浏览器自动化（Selenium）、人工智能 API（讯飞星火和 HuggingFace）、文本分析等多种技术，实现了自动登录、内容抓取、智能选项分析、自动答题等全流程，极大提升刷题效率。
-
----
 
 ### 功能简介
 
@@ -135,109 +17,173 @@ Questions or suggestions? Please open an [Issue](https://github.com/m3lanCH0lic/
 - **多种智能分析方式**：
   - 讯飞星火大模型（SparkAI）自动答题
   - HuggingFace API 智能分析
-  - 基于关键词的文本分析算法
+  - 基于关键词的 TF-IDF/增强文本分析算法
 - **自动统计答题与准确率**，支持多轮答题，自动进入下一题，异常自动刷新重试。
-- **支持 Windows 和 macOS**，自动适配 Chrome 路径。
+- **支持 Windows 和 macOS**，自动适配 Chrome 路径和驱动。
 - **代码结构清晰，易于扩展。**
 
----
+### 技术栈
+
+- Python 3.8 及以上
+- Selenium（浏览器自动化）
+- scikit-learn、numpy（TF-IDF 文本分析）
+- websocket-client、requests（API 通信）
+- 多线程、正则分析等
 
 ### 环境准备
 
-#### 1. Python 环境
+1. **安装 Python 3.8 及以上版本**
 
-建议使用 Python 3.8 及以上版本。
+2. **安装依赖库**
+   ```bash
+   pip install selenium scikit-learn numpy websocket-client requests
+   ```
 
-#### 2. 安装依赖
+3. **安装 Chrome 浏览器及 ChromeDriver**
+   - [下载 Chrome 浏览器](https://www.google.com/chrome/)
+   - [下载与浏览器版本匹配的 ChromeDriver](https://chromedriver.chromium.org/downloads)
+   - 将 chromedriver 加到系统 PATH 或与 Main.py 同目录
 
-需要以下 Python 库：
-
-```bash
-pip install selenium requests websocket-client
-```
-
-> 注：如需调用 HuggingFace 或讯飞星火 API，需提前注册相关账号并获取 API Token。
-
-#### 3. 准备 Chrome 浏览器及驱动
-
-- 下载并安装 [Google Chrome 浏览器](https://www.google.com/chrome/)
-- 下载与 Chrome 版本匹配的 [ChromeDriver](https://chromedriver.chromium.org/downloads) 并配置到环境变量或项目目录
-
----
+4. **（可选）申请 AI API 密钥**
+   - [讯飞星火开放平台](https://www.xfyun.cn/)
+   - [HuggingFace Token](https://huggingface.co/settings/tokens)
+   - 在 `CONFIG` 字典中填写对应信息
 
 ### 快速开始
 
-#### 1. 克隆代码
+1. **克隆代码**
+   ```bash
+   git clone https://github.com/m3lanCH0lic/Auto-answer-readtheory-.git
+   cd Auto-answer-readtheory-
+   ```
 
-```bash
-git clone https://github.com/m3lanCH0lic/Auto-answer-readtheory-.git
-cd Auto-answer-readtheory-
-```
+2. **配置 API 密钥（可选）**
+   编辑 `Main.py`，在 `CONFIG` 字典中填写你的 API 信息：
 
-#### 2. 配置 API 密钥（可选）
+   ```python
+   CONFIG = {
+       "spark_appid": "你的讯飞星火AppID",
+       "spark_api_key": "你的讯飞星火API Key",
+       "spark_api_secret": "你的讯飞星火API Secret",
+       "huggingface_token": "你的HuggingFace Token"
+   }
+   ```
 
-编辑 `Main.py`，在 `CONFIG` 字典中填入你的 API 信息：
+   如无需 AI 辅助，可留空，程序将仅用关键词分析答题。
 
-```python
-CONFIG = {
-    "spark_appid": "你的讯飞星火AppID",
-    "spark_api_key": "你的讯飞星火API Key",
-    "spark_api_secret": "你的讯飞星火API Secret",
-    "huggingface_token": "你的HuggingFace Token"
-}
-```
+3. **运行脚本**
+   ```bash
+   python Main.py
+   ```
 
-如无需AI辅助，可留空，程序将仅用关键词分析答题。
-
-#### 3. 运行脚本
-
-```bash
-python Main.py
-```
-
-#### 4. 交互说明
-
-- **输入用户名和密码**：按提示输入你的 ReadTheory 账号和密码（密码输入时不回显）。
-- **输入测验数量**：可指定要自动完成的测试数量，直接回车默认为 20。
-- 程序自动运行，期间会输出进度、分析方法、准确率等信息。
-- 支持中断（Ctrl+C）。
+4. **按提示操作**
+   - 输入 ReadTheory 用户名、密码
+   - 输入测验数量（回车默认为 20）
+   - 程序自动完成后输出统计信息
 
 ---
 
-### 主要技术说明
+## English Instructions
 
-- **Selenium**：自动控制浏览器，模拟用户操作。
-- **WebSocket**：与讯飞星火 API 实时通信，获取 AI 分析结果。
-- **requests**：调用 HuggingFace API 进行远程智能分析。
-- **正则与文本分析**：当 AI 不可用时，采用关键词分析算法。
-- **多线程**：保证 WebSocket 通信与主流程并行。
-- **异常和超时处理**：保证程序健壮性和自动恢复能力。
+### Project Overview
+
+This project is a Python-based smart auto-answer bot for the [ReadTheory](https://readtheory.org/) English reading platform. It combines browser automation (Selenium), AI APIs (SparkAI, HuggingFace), and text analysis techniques to automate login, content extraction, smart answer analysis, and answer submission—greatly improving quiz efficiency.
+
+### Features
+
+- **Auto login and answering**: Uses Selenium to control Chrome for automated login and answering.
+- **Multiple smart analysis modes**:
+  - SparkAI (iFlytek) large model answering
+  - HuggingFace API smart analysis
+  - Keyword and TF-IDF/enhanced text analysis
+- **Automatic quiz statistics and accuracy**, supports multi-round quiz, auto next/refresh/retry.
+- **Supports Windows and macOS**, with chrome binary path auto-detection.
+- **Clear code structure, easy for extension.**
+
+### Tech Stack
+
+- Python 3.8+
+- Selenium (browser automation)
+- scikit-learn, numpy (TF-IDF text analysis)
+- websocket-client, requests (API communication)
+- Multithreading, regex, etc.
+
+### Prerequisites
+
+1. **Install Python 3.8+**
+
+2. **Install dependencies**
+   ```bash
+   pip install selenium scikit-learn numpy websocket-client requests
+   ```
+
+3. **Install Chrome browser and ChromeDriver**
+   - [Download Chrome browser](https://www.google.com/chrome/)
+   - [Download the matching ChromeDriver](https://chromedriver.chromium.org/downloads)
+   - Place chromedriver in system PATH or in the same directory as Main.py
+
+4. **(Optional) Acquire AI API Keys**
+   - [SparkAI (iFlytek) Open Platform](https://www.xfyun.cn/)
+   - [HuggingFace Token](https://huggingface.co/settings/tokens)
+   - Fill in the `CONFIG` dictionary in Main.py
+
+### Quick Start
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/m3lanCH0lic/Auto-answer-readtheory-.git
+   cd Auto-answer-readtheory-
+   ```
+
+2. **Configure API Keys (optional)**
+   Edit `Main.py`, fill your API keys in the `CONFIG` dictionary:
+
+   ```python
+   CONFIG = {
+       "spark_appid": "your SparkAI AppID",
+       "spark_api_key": "your SparkAI API Key",
+       "spark_api_secret": "your SparkAI API Secret",
+       "huggingface_token": "your HuggingFace Token"
+   }
+   ```
+
+   Leave blank to use only the keyword analysis method.
+
+3. **Run the script**
+   ```bash
+   python Main.py
+   ```
+
+4. **Follow the prompts**
+   - Enter your ReadTheory username and password
+   - Enter number of quizzes (default 20)
+   - The program will run automatically and output statistics
 
 ---
 
-### 常见问题
+## FAQ
 
-1. **登录失败或答题异常？**
-   - 检查用户名、密码是否正确，或网页结构是否有变。
-   - 检查 Chrome 浏览器及驱动是否匹配。
+1. **Login or answering fails?**
+   - Double-check username/password and site structure.
+   - Ensure Chrome and ChromeDriver are matched.
 
-2. **API 调用失败？**
-   - 检查 API Key 是否有效，网络是否畅通。
+2. **API call fails?**
+   - Check API keys and network connectivity.
 
-3. **无法定位元素？**
-   - 可能是网站前端结构变动，需适当调整 XPath。
-
----
-
-### 免责声明
-
-- 本项目仅供学习和研究自动化与 AI 技术使用，严禁用于商业用途或违反 ReadTheory 平台规则的行为。
-- 使用本项目带来的账号风险请自负。
+3. **Element not found?**
+   - The ReadTheory website may have changed—adjust XPath in the code if needed.
 
 ---
 
-### 贡献与反馈
+## Disclaimer
 
-如有建议或问题，欢迎在 [GitHub Issues](https://github.com/m3lanCH0lic/Auto-answer-readtheory-/issues) 提出！
+- For research, study, and non-commercial use only.
+- Do not use against ReadTheory's TOS. Account risks are your own responsibility.
+
+---
+
+## Feedback & Contribution
+
+Feel free to submit issues or suggestions via [GitHub Issues](https://github.com/m3lanCH0lic/Auto-answer-readtheory-/issues)!
 
 ---
